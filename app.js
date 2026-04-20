@@ -1083,21 +1083,24 @@ function wJobSite() {
     </div>
     ${missing.length ? `<div class="strip strip-warn">You are missing ${missing.length} required tool(s). Collect them before starting.</div>` : '<div class="strip strip-ok">You have all required tools for this job.</div>'}
     <div class="sdiv">Required tools for this job</div>
-    ${needed.map(t => {
-      const have   = t.holder === currentUser.id;
-      const isOwn  = t.owner === currentUser.id;
+    ${needed.length ? needed.map(t => {
+      const have     = t.holder === currentUser.id;
       const isWhTool = t.owner === 'warehouse';
-      const goView = isWhTool ? 'w-warehouse' : 'w-borrow';
+      const goView   = isWhTool ? 'w-warehouse' : 'w-borrow';
+      const holderLabel = isWhTool
+        ? (t.holder && t.holder !== '' ? 'Checked out to ' + uname(t.holder) : 'Available in warehouse')
+        : (t.holder && t.holder !== '' ? 'With ' + uname(t.holder) : 'Owned by ' + uname(t.owner));
       return `<div class="card" style="display:flex;align-items:center;gap:12px">
         <span class="dot ${have ? 'dot-g' : 'dot-r'}" style="flex-shrink:0"></span>
         <div style="flex:1">
           <div class="bold" style="font-size:13px">${t.name}</div>
-          <div class="small muted">${t.cat}${isWhTool ? ' · Company tool' : ''}</div>
+          <div class="small muted">${t.cat}${isWhTool ? ' \u00b7 Company tool' : ''} \u00b7 ${holderLabel}</div>
         </div>
         ${have ? '<span class="badge badge-green" style="font-size:10px">I have it</span>'
                : `<span class="badge badge-red" style="font-size:10px">Not with me</span>
                   <button class="btn btn-primary" style="font-size:10px;padding:4px 9px;margin-left:4px" onclick="go('${goView}')">Request</button>`}
-      </div>`;}).join('')}`;
+      </div>`;})
+    .join('') : '<div class="strip strip-warn">Tool list unavailable — contact admin to verify the job template.</div>'}` ;
 }
 
 async function startJob(jId)  {
@@ -1133,7 +1136,17 @@ function wBorrow() {
 
 function renderBorrowList(list) {
   if (!borrowSearch) return '<div style="text-align:center;padding:32px 0;color:var(--color-text-tertiary);font-size:13px">Start typing to find a tool</div>';
-  if (!list || !list.length) return `<div style="text-align:center;padding:24px 0;color:var(--color-text-secondary);font-size:13px">No tools found matching "<strong>${borrowSearch}</strong>"</div>`;
+  /* Called from oninput without args — compute the filtered list here */
+  if (list === undefined) {
+    const u = currentUser;
+    const peers = toolsArr().filter(t => t.holder && t.holder !== '' && t.holder !== u.id && t.owner !== 'warehouse' && t.owner !== u.id);
+    list = peers.filter(t =>
+      t.name.toLowerCase().includes(borrowSearch.toLowerCase()) ||
+      uname(t.holder).toLowerCase().includes(borrowSearch.toLowerCase()) ||
+      t.cat.toLowerCase().includes(borrowSearch.toLowerCase())
+    );
+  }
+  if (!list.length) return `<div style="text-align:center;padding:24px 0;color:var(--color-text-secondary);font-size:13px">No tools found matching "<strong>${borrowSearch}</strong>"</div>`;
   return list.map(t => `<div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
       <span class="bold" style="font-size:14px">${t.name}</span>
